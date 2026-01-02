@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MyTube - Video Platform</title>
+
+<style>
+body{
+  margin:0;
+  font-family:Arial;
+  background:#f1f1f1;
+}
+header{
+  background:red;
+  color:white;
+  padding:10px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.container{
+  padding:10px;
+}
+.card{
+  background:white;
+  margin-bottom:15px;
+  padding:10px;
+  border-radius:5px;
+}
+video{
+  width:100%;
+  max-height:300px;
+}
+button{
+  padding:5px 10px;
+  margin:5px 5px 5px 0;
+}
+input{
+  padding:5px;
+  width:100%;
+  margin-top:5px;
+}
+.short video{
+  height:200px;
+  object-fit:cover;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h2>📺 MyTube</h2>
+  <input type="file" id="upload" accept="video/*">
+</header>
+
+<div class="container">
+
+<h3>🔥 Videos</h3>
+<div id="videos"></div>
+
+<h3>🎬 Shorts</h3>
+<div id="shorts"></div>
+
+</div>
+
+<script>
+let channelName = localStorage.getItem("channel") || prompt("Enter your Channel Name");
+localStorage.setItem("channel", channelName);
+
+document.getElementById("upload").addEventListener("change", function(){
+  let file = this.files[0];
+  let url = URL.createObjectURL(file);
+
+  let isShort = confirm("Is this a SHORT video?");
+
+  let div = document.createElement("div");
+  div.className = "card" + (isShort ? " short" : "");
+
+  div.innerHTML = `
+    <h4>📢 ${channelName}</h4>
+    <video controls ${isShort ? "loop autoplay muted" : ""} src="${url}"></video>
+    <br>
+    <button onclick="like(this)">👍 Like <span>0</span></button>
+    <button onclick="subscribe(this)">➕ Follow <span>0</span></button>
+    <input placeholder="Write comment & press Enter" onkeypress="comment(event,this)">
+    <div class="comments"></div>
+  `;
+
+  if(isShort){
+    document.getElementById("shorts").prepend(div);
+  }else{
+    document.getElementById("videos").prepend(div);
+  }
+});
+
+function like(btn){
+  let span = btn.querySelector("span");
+  span.innerText = Number(span.innerText) + 1;
+}
+
+function subscribe(btn){
+  let span = btn.querySelector("span");
+  span.innerText = Number(span.innerText) + 1;
+}
+
+function comment(e,input){
+  if(e.key==="Enter"){
+    let box = input.nextElementSibling;
+    box.innerHTML += "<p>💬 "+input.value+"</p>";
+    input.value="";
+  }
+}
+</script>
+
+</body>
+</html>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>MyTube Login + Live</title>
+<style>
+body{font-family:Arial;background:#f1f1f1;margin:0}
+header{background:red;color:white;padding:10px;text-align:center}
+.box{background:white;margin:20px auto;padding:15px;width:300px;border-radius:5px}
+input,button{width:100%;padding:8px;margin-top:8px}
+#main{display:none}
+video{width:100%;margin-top:10px}
+</style>
+</head>
+
+<body>
+
+<header>
+<h2>📺 MyTube</h2>
+</header>
+
+<!-- LOGIN -->
+<div class="box" id="loginBox">
+<h3>🔐 Login / Signup</h3>
+<input id="username" placeholder="Enter username">
+<button onclick="login()">Login</button>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+<div class="box">
+<h3>👤 Welcome <span id="user"></span></h3>
+<button onclick="logout()">Logout</button>
+</div>
+
+<div class="box">
+<h3>🔴 Go Live</h3>
+<button onclick="startLive()">Start Live</button>
+<button onclick="stopLive()">Stop Live</button>
+<video id="liveVideo" autoplay muted></video>
+</div>
+</div>
+
+<script>
+let savedUser = localStorage.getItem("user");
+
+if(savedUser){
+  showMain(savedUser);
+}
+
+function login(){
+  let u = document.getElementById("username").value;
+  if(u==="") return alert("Enter username");
+  localStorage.setItem("user",u);
+  showMain(u);
+}
+
+function showMain(u){
+  document.getElementById("loginBox").style.display="none";
+  document.getElementById("main").style.display="block";
+  document.getElementById("user").innerText=u;
+}
+
+function logout(){
+  localStorage.removeItem("user");
+  location.reload();
+}
+
+let stream;
+function startLive(){
+  navigator.mediaDevices.getUserMedia({video:true,audio:true})
+  .then(s=>{
+    stream=s;
+    document.getElementById("liveVideo").srcObject=s;
+  })
+  .catch(()=>alert("Camera access denied"));
+}
+
+function stopLive(){
+  if(stream){
+    stream.getTracks().forEach(t=>t.stop());
+  }
+}
+</script>
+
+</body>
+</html>
+
+
+
+
+
+<!DOCTYPE html>
+<html>
+<body>
+
+<h3>🔴 2 Person Live Room</h3>
+
+<input id="room" placeholder="Room ID">
+<button onclick="join()">Join</button>
+
+<div style="display:flex">
+  <video id="v1" autoplay muted></video>
+  <video id="v2" autoplay></video>
+</div>
+
+<input id="msg" placeholder="Chat">
+<button onclick="send()">Send</button>
+<div id="chat"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let pc1, pc2, stream, roomId;
+
+function join(){
+  roomId = room.value;
+  socket.emit("join", roomId);
+
+  navigator.mediaDevices.getUserMedia({video:true,audio:true})
+  .then(s=>{
+    stream=s;
+    v1.srcObject=s;
+
+    pc1 = new RTCPeerConnection();
+    stream.getTracks().forEach(t=>pc1.addTrack(t,stream));
+
+    pc1.onicecandidate = e=>{
+      if(e.candidate)
+        socket.emit("signal",{room:roomId,signal:e.candidate});
+    };
+
+    pc1.createOffer().then(o=>{
+      pc1.setLocalDescription(o);
+      socket.emit("signal",{room:roomId,signal:o});
+    });
+  });
+}
+
+socket.on"signal", async data=>
+  if(!pc2)
+    pc2 = new RTCPeerConnection();
+    pc2.ontrack = e => v2.srcObject = e.stre
+
+
+
+
+
+
+
+
+
+    let scores = {};
+
+io.on("connection", socket => {
+
+  socket.on("join", room => {
+    socket.join(room);
+    if(!scores[room]){
+      scores[room] = {host1:0, host2:0};
+    }
+    io.to(room).emit("score", scores[room]);
+  });
+
+  socket.on("gift", data => {
+    scores[data.room][data.host] += data.points;
+    io.to(data.room).emit("score", scores[data.room]);
+  });
+
+});
+
+
+let viewers = {};
+
+io.on("connection", socket => {
+
+  socket.on("join", room => {
+    socket.join(room);
+
+    if(!viewers[room]) viewers[room] = 0;
+    viewers[room]++;
+
+    io.to(room).emit("views", viewers[room]);
+
+    socket.on("disconnect", () => {
+      viewers[room]--;
+      io.to(room).emit("views", viewers[room]);
+    });
+  });
+
+});
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Co-Host Live Battle</title>
+<style>
+body{font-family:Arial;text-align:center;background:#f0f0f0;margin:0;padding:10px;}
+video{width:45%;margin:5px;border:2px solid red;border-radius:5px;}
+button{margin:5px;padding:8px;}
+.box{background:white;padding:10px;marg
